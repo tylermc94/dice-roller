@@ -1,0 +1,2000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D&D Dice Roller</title>
+<style>
+  /* Load fantasy/medieval fonts from Google Fonts */
+  @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel:wght@400;700&family=Uncial+Antiqua&family=Pirata+One&display=swap');
+
+  /* ==========================================
+     BASE STYLES
+     ========================================== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a2e;
+    color: #e0d6c8;
+    font-family: 'Cinzel', serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ==========================================
+     SIDEBAR - Left panel with controls
+     ========================================== */
+  #sidebar {
+    width: 290px;
+    background: linear-gradient(180deg, #16213e 0%, #0f1a30 100%);
+    border-right: 2px solid #c9a84c;
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    gap: 6px;
+    overflow-y: auto;
+  }
+
+  #sidebar h1 {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 24px;
+    color: #c9a84c;
+    text-align: center;
+    margin-bottom: 2px;
+    text-shadow: 0 0 10px rgba(201, 168, 76, 0.4);
+  }
+
+  /* ==========================================
+     DICE TILE GRID - 4x2 grid of die selectors
+     ========================================== */
+  #dice-list {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .dice-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(201, 168, 76, 0.2);
+    border-radius: 8px;
+    padding: 6px 2px 4px;
+    transition: background 0.2s;
+    position: relative;
+  }
+  .dice-tile:hover { background: rgba(255, 255, 255, 0.1); }
+
+  /* Tile icon: small canvas showing die shape with count overlay */
+  .dice-tile .tile-icon {
+    width: 40px; height: 40px;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dice-tile .tile-icon canvas { width: 40px; height: 40px; }
+  .dice-tile .tile-count {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 16px; font-weight: 700; color: #fff;
+    text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7);
+    pointer-events: none; z-index: 1;
+  }
+  .dice-tile .tile-label { font-size: 11px; font-weight: 700; color: #ccc; margin-top: 1px; }
+
+  /* +/- buttons under each tile */
+  .tile-btns { display: flex; gap: 2px; margin-top: 3px; }
+  .tile-btns button {
+    width: 26px; height: 20px;
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    background: rgba(201, 168, 76, 0.1);
+    color: #c9a84c; font-size: 14px; font-weight: 700;
+    border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; font-family: 'Cinzel', serif; padding: 0;
+  }
+  .tile-btns button:hover { background: rgba(201, 168, 76, 0.35); }
+
+  /* ==========================================
+     COLLAPSIBLE CONFIG SECTIONS
+     ========================================== */
+  .config-section {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(201, 168, 76, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .config-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 12px; cursor: pointer; font-size: 13px; color: #aaa;
+    transition: color 0.2s;
+  }
+  .config-toggle:hover { color: #ddd; }
+  .config-toggle .arrow { font-size: 10px; transition: transform 0.2s; }
+  .config-toggle .arrow.open { transform: rotate(90deg); }
+  .config-panel { display: none; padding: 4px 12px 10px; }
+  .config-panel.open { display: block; }
+
+  /* ==========================================
+     INLINE SECTION - Non-collapsible controls
+     (Keep/Mode/Bonus row)
+     ========================================== */
+  .inline-section {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(201, 168, 76, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .inline-section label { font-size: 12px; color: #aaa; display: block; margin-bottom: 4px; }
+  .inline-section select, .inline-section input[type="number"] {
+    width: 100%; padding: 5px 8px;
+    background: #1a1a2e; color: #e0d6c8;
+    border: 1px solid #c9a84c; border-radius: 6px;
+    font-family: 'Cinzel', serif; font-size: 13px; cursor: pointer;
+  }
+  .inline-row { display: flex; gap: 8px; }
+  .inline-row > * { flex: 1; }
+
+  /* ==========================================
+     PHYSICS SLIDER ROWS
+     ========================================== */
+  .slider-row { margin-bottom: 6px; }
+  .slider-row .slider-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;
+  }
+  .slider-row label { font-size: 11px; color: #999; }
+  .slider-row .slider-val { font-size: 11px; color: #c9a84c; min-width: 32px; text-align: right; }
+  .slider-row input[type="range"] {
+    width: 100%; height: 4px;
+    -webkit-appearance: none; appearance: none;
+    background: rgba(201, 168, 76, 0.2); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%; background: #c9a84c; cursor: pointer;
+  }
+  .slider-row input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; background: #c9a84c; border: none; cursor: pointer;
+  }
+
+  .reset-btn {
+    width: 100%; padding: 5px; font-family: 'Cinzel', serif; font-size: 11px;
+    background: transparent; color: #777; border: 1px solid #444;
+    border-radius: 4px; cursor: pointer; margin-top: 4px; transition: all 0.2s;
+  }
+  .reset-btn:hover { color: #ccc; border-color: #888; }
+
+  /* ==========================================
+     COLOR SWATCH SELECTORS
+     ========================================== */
+  .swatch-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .swatch {
+    width: 24px; height: 24px; border-radius: 4px; cursor: pointer;
+    border: 2px solid transparent; transition: border-color 0.15s;
+  }
+  .swatch:hover, .swatch.active { border-color: #fff; }
+
+  /* ==========================================
+     PANEL HEADERS & POP-OUT BUTTONS
+     ========================================== */
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; color: #aaa; margin-bottom: 4px;
+  }
+  .popout-btn {
+    background: none; border: 1px solid rgba(201, 168, 76, 0.3);
+    color: #888; font-size: 12px; width: 22px; height: 22px;
+    border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; padding: 0; line-height: 1; flex-shrink: 0;
+  }
+  .popout-btn:hover { color: #c9a84c; border-color: #c9a84c; }
+  .config-toggle-right { display: flex; align-items: center; gap: 6px; }
+
+  /* ==========================================
+     POP-OUT FLOATING WINDOWS
+     ========================================== */
+  .popout-window {
+    position: absolute;
+    background: linear-gradient(180deg, #1a2540 0%, #141d33 100%);
+    border: 2px solid #c9a84c;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 12px rgba(201, 168, 76, 0.15);
+    z-index: 100;
+    display: flex; flex-direction: column;
+    min-width: 200px; min-height: 80px;
+    overflow: hidden;
+  }
+  .popout-titlebar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px;
+    background: rgba(201, 168, 76, 0.1);
+    border-bottom: 1px solid rgba(201, 168, 76, 0.3);
+    cursor: move; user-select: none; flex-shrink: 0;
+  }
+  .popout-titlebar span {
+    font-size: 12px; color: #c9a84c; font-family: 'MedievalSharp', cursive;
+  }
+  .dock-btn {
+    background: none; border: 1px solid rgba(201, 168, 76, 0.3);
+    color: #c9a84c; font-size: 14px; width: 22px; height: 22px;
+    border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; transition: all 0.2s;
+  }
+  .dock-btn:hover { background: rgba(201, 168, 76, 0.2); }
+  .popout-content {
+    flex: 1; overflow-y: auto; padding: 10px; user-select: auto;
+  }
+  .popout-resize {
+    position: absolute; bottom: 0; right: 0; width: 16px; height: 16px;
+    cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, rgba(201, 168, 76, 0.3) 50%);
+    border-radius: 0 0 6px 0;
+  }
+
+  /* Hide sidebar slot when panel is popped out */
+  .panel-docked-hidden { display: none !important; }
+
+  /* ==========================================
+     RIGHT SIDEBAR - Roll History Panel
+     Full-height panel on the right side of
+     the screen, same width as the left sidebar.
+     Houses the roll history with die shapes
+     and reroll tracking.
+     ========================================== */
+  #history-sidebar {
+    width: 290px;
+    background: linear-gradient(180deg, #16213e 0%, #0f1a30 100%);
+    border-left: 2px solid #c9a84c;
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    overflow: hidden;
+  }
+
+  /* Header area with title and clear button */
+  #history-sidebar .history-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+
+  #history-sidebar .history-sidebar-header h2 {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 20px;
+    color: #c9a84c;
+    text-shadow: 0 0 10px rgba(201, 168, 76, 0.4);
+  }
+
+  /* Scrollable list of history entries filling the remaining height */
+  #history-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+  }
+
+  /* Custom scrollbar for history list */
+  #history-list::-webkit-scrollbar { width: 6px; }
+  #history-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
+  #history-list::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 3px; }
+  #history-list::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.5); }
+
+  /* ==========================================
+     HISTORY ENTRY CARDS
+     Each card shows the total, a row of die
+     shape icons with values, and a text breakdown.
+     Reroll entries show old values struck through
+     in red and new values in green.
+     ========================================== */
+  .history-entry {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(201, 168, 76, 0.15);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  /* Reroll entries get a subtle orange left border to visually distinguish them */
+  .history-entry.reroll-entry {
+    border-left: 3px solid rgba(230, 126, 34, 0.5);
+  }
+
+  /* Top row: total on the left, optional reroll badge, time on the right */
+  .history-header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  /* The roll total number, styled large and gold */
+  .history-total {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 22px;
+    color: #c9a84c;
+    font-weight: 700;
+  }
+
+  /* For rerolls, the old total is shown struck through in red before an arrow */
+  .old-total {
+    text-decoration: line-through;
+    color: #e74c3c;
+    font-size: 18px;
+  }
+
+  /* Small "Reroll" badge next to the total for reroll entries */
+  .reroll-label {
+    font-size: 10px;
+    color: #e67e22;
+    background: rgba(230, 126, 34, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+
+  .history-time {
+    color: #555;
+    font-size: 11px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /* ==========================================
+     HISTORY DICE ROW
+     Flexbox row of small die icons. Each icon
+     is a canvas drawn with the die's 2D shape
+     outline and its rolled value on top.
+     ========================================== */
+  .history-dice-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 6px 0;
+  }
+
+  /* Individual die cell: optional old value on top, canvas icon below */
+  .history-die-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .history-die-cell canvas {
+    display: block;
+  }
+
+  /* Struck-through old value shown in red above a rerolled die's shape */
+  .old-die-value {
+    font-size: 11px;
+    color: #e74c3c;
+    text-decoration: line-through;
+    line-height: 1;
+    font-weight: 700;
+  }
+
+  /* Dice that were not kept (dropped by keep-N) shown dimmed */
+  .history-die-cell.not-kept {
+    opacity: 0.4;
+  }
+
+  /* Text breakdown line at the bottom of each history entry */
+  .history-breakdown {
+    color: #888;
+    font-size: 12px;
+    margin-top: 4px;
+    word-break: break-word;
+    line-height: 1.4;
+  }
+
+  /* ==========================================
+     ACTION BUTTONS
+     ========================================== */
+  #roll-btn {
+    margin-top: auto; padding: 14px;
+    font-family: 'MedievalSharp', cursive; font-size: 26px;
+    background: linear-gradient(135deg, #c9a84c, #a67c2e);
+    color: #1a1a2e; border: none; border-radius: 10px;
+    cursor: pointer; transition: all 0.2s;
+    text-shadow: 0 1px 1px rgba(255,255,255,0.3);
+    box-shadow: 0 4px 15px rgba(201, 168, 76, 0.3);
+  }
+  #roll-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(201, 168, 76, 0.5); }
+  #roll-btn:active { transform: translateY(0); }
+
+  #clear-btn {
+    padding: 6px; font-family: 'Cinzel', serif; font-size: 12px;
+    background: transparent; color: #888; border: 1px solid #444;
+    border-radius: 6px; cursor: pointer; transition: all 0.2s;
+  }
+  #clear-btn:hover { color: #ccc; border-color: #888; }
+
+  /* ==========================================
+     MAIN AREA - Results bar + rolling tray
+     Sits between the left sidebar and the
+     right history sidebar.
+     ========================================== */
+  #main { flex: 1; display: flex; flex-direction: column; position: relative; }
+
+  #total-bar {
+    height: 60px;
+    background: linear-gradient(90deg, #16213e, #1a1a3e, #16213e);
+    border-bottom: 2px solid #c9a84c;
+    display: flex; align-items: center; justify-content: center;
+    gap: 20px; font-size: 22px; padding: 0 20px;
+  }
+  #total-bar .label { color: #888; }
+  #total-bar .value {
+    color: #c9a84c; font-size: 32px; font-weight: 700;
+    font-family: 'MedievalSharp', cursive;
+    text-shadow: 0 0 12px rgba(201, 168, 76, 0.5);
+    min-width: 60px; text-align: center;
+  }
+  #breakdown { color: #999; font-size: 14px; max-width: 60%; text-align: center; line-height: 1.4; }
+
+  /* Canvas fills the remaining space */
+  #canvas-wrap { flex: 1; position: relative; overflow: hidden; }
+  #tray { display: block; width: 100%; height: 100%; }
+  #status-msg {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    color: rgba(201, 168, 76, 0.6); font-family: 'MedievalSharp', cursive;
+    font-size: 18px; pointer-events: none; transition: opacity 0.5s;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================
+     LEFT SIDEBAR - Dice selection & settings
+     ============================================ -->
+<div id="sidebar">
+  <h1>Dice Roller</h1>
+
+  <!-- Dice Selection (with pop-out button) -->
+  <div id="panel-dice-selection">
+    <div class="panel-header">
+      <span>Dice Selection</span>
+      <button class="popout-btn" data-panel="dice-selection" title="Pop out">&#x2750;</button>
+    </div>
+    <div id="dice-list"></div>
+  </div>
+
+  <!-- Keep/Mode/Bonus (with pop-out button) -->
+  <div id="panel-keep-bonus">
+    <div class="panel-header">
+      <span>Keep / Bonus</span>
+      <button class="popout-btn" data-panel="keep-bonus" title="Pop out">&#x2750;</button>
+    </div>
+    <div class="inline-section" id="keep-bonus-content">
+      <div class="inline-row">
+        <div>
+          <label>Keep</label>
+          <select id="keep-select"><option value="0">All</option></select>
+        </div>
+        <div>
+          <label>Mode</label>
+          <select id="keep-mode">
+            <option value="highest">Highest</option>
+            <option value="lowest">Lowest</option>
+          </select>
+        </div>
+        <div>
+          <label>Bonus</label>
+          <input type="number" id="bonus-input" value="0" style="width:100%">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visual Settings (collapsible, with pop-out button) -->
+  <div class="config-section" id="panel-visual-settings">
+    <div class="config-toggle" id="visual-toggle">
+      <span>Visual Settings</span>
+      <div class="config-toggle-right">
+        <button class="popout-btn" data-panel="visual-settings" title="Pop out">&#x2750;</button>
+        <span class="arrow">&#9654;</span>
+      </div>
+    </div>
+    <div class="config-panel" id="visual-panel">
+      <div class="slider-row">
+        <label>Tray Background</label>
+        <div class="swatch-row" id="bg-swatches"></div>
+      </div>
+      <div class="slider-row" style="margin-top:8px">
+        <label>Dice Color Theme</label>
+        <div class="swatch-row" id="theme-swatches"></div>
+      </div>
+      <div class="slider-row" style="margin-top:8px">
+        <label>Font</label>
+        <select id="font-select" style="width:100%;padding:4px 8px;background:#1a1a2e;color:#e0d6c8;border:1px solid #c9a84c;border-radius:4px;font-size:12px;cursor:pointer">
+          <option value="Cinzel">Cinzel (Default)</option>
+          <option value="MedievalSharp">Medieval Sharp</option>
+          <option value="Uncial Antiqua">Uncial Antiqua</option>
+          <option value="Pirata One">Pirata One</option>
+          <option value="Georgia">Georgia</option>
+          <option value="monospace">Monospace</option>
+        </select>
+      </div>
+      <div class="slider-row" style="margin-top:8px">
+        <label>Accent Color</label>
+        <div class="swatch-row" id="accent-swatches"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Physics Settings (collapsible, with pop-out button) -->
+  <div class="config-section" id="panel-physics-settings">
+    <div class="config-toggle" id="physics-toggle">
+      <span>Physics Settings</span>
+      <div class="config-toggle-right">
+        <button class="popout-btn" data-panel="physics-settings" title="Pop out">&#x2750;</button>
+        <span class="arrow">&#9654;</span>
+      </div>
+    </div>
+    <div class="config-panel" id="physics-panel">
+      <div class="slider-row">
+        <div class="slider-header"><label>Time to Lock</label><span class="slider-val" id="val-lock">3.0s</span></div>
+        <input type="range" id="sl-lock" min="1" max="10" step="0.5" value="3">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><label>Friction</label><span class="slider-val" id="val-friction">High</span></div>
+        <input type="range" id="sl-friction" min="0" max="100" step="1" value="75">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><label>Throw Speed</label><span class="slider-val" id="val-speed">Medium</span></div>
+        <input type="range" id="sl-speed" min="2" max="30" step="1" value="14">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><label>Bounce</label><span class="slider-val" id="val-bounce">0.50</span></div>
+        <input type="range" id="sl-bounce" min="0" max="100" step="1" value="50">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><label>Gravity Well</label><span class="slider-val" id="val-gravity">Low</span></div>
+        <input type="range" id="sl-gravity" min="0" max="100" step="1" value="10">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><label>Dice Size</label><span class="slider-val" id="val-size">1.0x</span></div>
+        <input type="range" id="sl-size" min="50" max="200" step="5" value="100">
+      </div>
+      <div class="slider-row">
+        <div class="slider-header"><label>Spin</label><span class="slider-val" id="val-spin">Medium</span></div>
+        <input type="range" id="sl-spin" min="0" max="100" step="1" value="50">
+      </div>
+      <button class="reset-btn" id="reset-physics-btn">Reset to Defaults</button>
+    </div>
+  </div>
+
+  <button id="roll-btn">Roll Dice</button>
+  <button id="clear-btn">Clear All</button>
+</div>
+
+<!-- ============================================
+     MAIN AREA - Canvas and total bar
+     ============================================ -->
+<div id="main">
+  <div id="total-bar">
+    <span class="label">Total:</span>
+    <span class="value" id="total-value">&mdash;</span>
+    <span id="breakdown"></span>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="tray"></canvas>
+    <div id="status-msg">Select dice and roll!</div>
+  </div>
+</div>
+
+<!-- ============================================
+     RIGHT SIDEBAR - Roll History
+     Full-height panel showing roll history with
+     die shape icons and reroll tracking. Each
+     entry displays die values on top of neutral
+     2D shape outlines. Rerolled values appear
+     struck through in red with new values in green.
+     ============================================ -->
+<div id="history-sidebar">
+  <div class="history-sidebar-header">
+    <h2>Roll History</h2>
+    <button class="reset-btn" id="clear-history-btn" style="width:auto;padding:4px 10px;margin:0">Clear</button>
+  </div>
+  <div id="history-list">
+    <div style="color:#555;font-size:14px;text-align:center;padding:16px">No rolls yet</div>
+  </div>
+</div>
+
+<script>
+// ============================================================================
+//  DICE DEFINITIONS
+//  Each die type has a number of sides, a label (e.g. "d20"), and a shape
+//  name that maps to drawing functions for both the rolling tray and the
+//  history panel icons.
+// ============================================================================
+const DICE_DEFS = [
+  { sides:   3, label: 'd3',   shape: 'triangle' },
+  { sides:   4, label: 'd4',   shape: 'tetrahedron' },
+  { sides:   6, label: 'd6',   shape: 'cube' },
+  { sides:   8, label: 'd8',   shape: 'octahedron' },
+  { sides:  10, label: 'd10',  shape: 'trapezohedron' },
+  { sides:  12, label: 'd12',  shape: 'dodecahedron' },
+  { sides:  20, label: 'd20',  shape: 'icosahedron' },
+  { sides: 100, label: 'd100', shape: 'percentile' },
+];
+
+// ============================================================================
+//  COLOR THEMES & VISUAL PRESETS
+// ============================================================================
+const COLOR_THEMES = {
+  classic: ['#e06c9f','#e74c3c','#3498db','#2ecc71','#e67e22','#9b59b6','#f1c40f','#1abc9c'],
+  fire:    ['#ff6b35','#ff4444','#ff8c00','#cc3300','#ff5722','#e65100','#ffab00','#dd2c00'],
+  ice:     ['#81d4fa','#4fc3f7','#29b6f6','#0288d1','#80deea','#4dd0e1','#00bcd4','#0097a7'],
+  neon:    ['#ff00ff','#ff1744','#00e5ff','#76ff03','#ffea00','#d500f9','#1de9b6','#f50057'],
+  pastel:  ['#f8bbd0','#ef9a9a','#90caf9','#a5d6a7','#ffcc80','#ce93d8','#fff59d','#80cbc4'],
+  earth:   ['#8d6e63','#a1887f','#6d4c41','#795548','#bcaaa4','#4e342e','#d7ccc8','#3e2723'],
+  galaxy:  ['#e040fb','#7c4dff','#448aff','#18ffff','#69f0ae','#b388ff','#82b1ff','#a7ffeb'],
+};
+
+const BG_PRESETS = [
+  { label: 'Purple Felt', center: '#2d1f3d', edge: '#1a1225', tex: 'rgba(100,60,120,0.03)' },
+  { label: 'Green Felt',  center: '#1f3d2d', edge: '#122518', tex: 'rgba(60,120,80,0.03)' },
+  { label: 'Red Felt',    center: '#3d1f1f', edge: '#251212', tex: 'rgba(120,60,60,0.03)' },
+  { label: 'Blue Felt',   center: '#1f2d3d', edge: '#121825', tex: 'rgba(60,80,120,0.03)' },
+  { label: 'Dark',        center: '#222222', edge: '#111111', tex: 'rgba(80,80,80,0.03)' },
+  { label: 'Black',       center: '#0a0a0a', edge: '#050505', tex: 'rgba(40,40,40,0.02)' },
+  { label: 'Wood',        center: '#5c3a1e', edge: '#3a2412', tex: 'rgba(120,80,40,0.04)' },
+];
+
+const ACCENT_COLORS = ['#c9a84c','#e74c3c','#3498db','#2ecc71','#e67e22','#9b59b6','#1abc9c','#ecf0f1'];
+
+// ============================================================================
+//  VISUAL CONFIG STATE
+// ============================================================================
+const vis = { theme: 'classic', bgIdx: 0, diceFont: 'Cinzel', accentColor: '#c9a84c' };
+
+function getDieColor(idx) { return COLOR_THEMES[vis.theme][idx] || '#888'; }
+
+// ============================================================================
+//  DICE SELECTION STATE
+//  Tracks how many of each die type the user has selected in the sidebar.
+// ============================================================================
+const diceState = {};
+DICE_DEFS.forEach(d => diceState[d.sides] = 0);
+
+// ============================================================================
+//  TILE ICON DRAWING
+//  Draws the small die shape icons in the sidebar tile grid.
+// ============================================================================
+function polyPath(ctx, r, n, start) {
+  for (let i = 0; i < n; i++) {
+    const a = start + (Math.PI * 2 * i) / n;
+    if (i === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+}
+
+/* Maps each die shape name to a function that draws
+   its 2D outline path centered at the origin.
+   Used for both tile icons and history panel die icons. */
+const SHAPE_DRAW = {
+  triangle:      (c, r) => polyPath(c, r * 0.9, 3, -Math.PI / 2),
+  tetrahedron:   (c, r) => polyPath(c, r * 0.95, 3, -Math.PI / 2),
+  cube:          (c, r) => { const s = r * 0.75; c.rect(-s, -s, s * 2, s * 2); },
+  octahedron:    (c, r) => polyPath(c, r * 0.9, 4, 0),
+  trapezohedron: (c, r) => { c.moveTo(0, -r); c.lineTo(r * 0.7, 0); c.lineTo(0, r); c.lineTo(-r * 0.7, 0); },
+  dodecahedron:  (c, r) => polyPath(c, r * 0.9, 5, -Math.PI / 2),
+  icosahedron:   (c, r) => polyPath(c, r * 0.85, 10, -Math.PI / 2),
+  percentile:    (c, r) => c.arc(0, 0, r * 0.85, 0, Math.PI * 2),
+};
+
+function drawTileIcon(cvs, dt, colorIdx) {
+  const size = 40, dpr = window.devicePixelRatio || 1;
+  cvs.width = size * dpr; cvs.height = size * dpr;
+  const c = cvs.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, size, size);
+  c.translate(size / 2, size / 2);
+  c.beginPath(); SHAPE_DRAW[dt.shape](c, size / 2); c.closePath();
+  c.fillStyle = getDieColor(colorIdx); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 1; c.stroke();
+}
+
+function refreshTileIcons() {
+  document.querySelectorAll('.dice-tile').forEach((tile, i) => {
+    drawTileIcon(tile.querySelector('canvas'), DICE_DEFS[i], i);
+  });
+}
+
+// ============================================================================
+//  BUILD SIDEBAR - DICE TILES
+//  Creates the 4x2 grid of clickable die type tiles with +/- buttons.
+// ============================================================================
+const listEl = document.getElementById('dice-list');
+DICE_DEFS.forEach((dt, idx) => {
+  const tile = document.createElement('div');
+  tile.className = 'dice-tile';
+  tile.innerHTML = `
+    <div class="tile-icon"><canvas></canvas><span class="tile-count" id="count-${dt.sides}">0</span></div>
+    <span class="tile-label">${dt.label}</span>
+    <div class="tile-btns">
+      <button class="dec" data-sides="${dt.sides}">&minus;</button>
+      <button class="inc" data-sides="${dt.sides}">+</button>
+    </div>`;
+  listEl.appendChild(tile);
+  drawTileIcon(tile.querySelector('canvas'), dt, idx);
+});
+
+function updateKeepDropdown() {
+  const total = Object.values(diceState).reduce((a, b) => a + b, 0);
+  const sel = document.getElementById('keep-select');
+  const prev = +sel.value;
+  sel.innerHTML = '<option value="0">All</option>';
+  for (let i = 1; i <= total; i++) {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = `Top ${i}`;
+    sel.appendChild(opt);
+  }
+  sel.value = (prev > 0 && prev <= total) ? prev : '0';
+}
+
+listEl.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const sides = +btn.dataset.sides;
+  if (btn.classList.contains('inc')) diceState[sides] = Math.min(diceState[sides] + 1, 20);
+  if (btn.classList.contains('dec')) diceState[sides] = Math.max(diceState[sides] - 1, 0);
+  document.getElementById(`count-${sides}`).textContent = diceState[sides];
+  updateKeepDropdown();
+});
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  DICE_DEFS.forEach(d => { diceState[d.sides] = 0; document.getElementById(`count-${d.sides}`).textContent = '0'; });
+  updateKeepDropdown();
+});
+
+// ============================================================================
+//  VISUAL SETTINGS PANEL
+// ============================================================================
+function setupVisuals() {
+  document.getElementById('visual-toggle').addEventListener('click', e => {
+    if (e.target.closest('.popout-btn')) return; // Don't toggle when clicking popout
+    document.getElementById('visual-panel').classList.toggle('open');
+    document.querySelector('#visual-toggle .arrow').classList.toggle('open');
+  });
+
+  const bgRow = document.getElementById('bg-swatches');
+  BG_PRESETS.forEach((bg, i) => {
+    const s = document.createElement('div');
+    s.className = 'swatch' + (i === 0 ? ' active' : '');
+    s.style.background = bg.center; s.title = bg.label;
+    s.addEventListener('click', () => {
+      vis.bgIdx = i;
+      bgRow.querySelectorAll('.swatch').forEach(x => x.classList.remove('active'));
+      s.classList.add('active');
+    });
+    bgRow.appendChild(s);
+  });
+
+  const themeRow = document.getElementById('theme-swatches');
+  Object.keys(COLOR_THEMES).forEach(key => {
+    const s = document.createElement('div');
+    s.className = 'swatch' + (key === 'classic' ? ' active' : '');
+    const cols = COLOR_THEMES[key];
+    s.style.background = `linear-gradient(135deg, ${cols[0]}, ${cols[3]}, ${cols[6]})`;
+    s.title = key;
+    s.addEventListener('click', () => {
+      vis.theme = key;
+      themeRow.querySelectorAll('.swatch').forEach(x => x.classList.remove('active'));
+      s.classList.add('active'); refreshTileIcons();
+    });
+    themeRow.appendChild(s);
+  });
+
+  document.getElementById('font-select').addEventListener('change', e => { vis.diceFont = e.target.value; });
+
+  const accRow = document.getElementById('accent-swatches');
+  ACCENT_COLORS.forEach(col => {
+    const s = document.createElement('div');
+    s.className = 'swatch' + (col === '#c9a84c' ? ' active' : '');
+    s.style.background = col;
+    s.addEventListener('click', () => {
+      vis.accentColor = col;
+      accRow.querySelectorAll('.swatch').forEach(x => x.classList.remove('active'));
+      s.classList.add('active');
+      document.querySelectorAll('#total-bar .value').forEach(el => el.style.color = col);
+    });
+    accRow.appendChild(s);
+  });
+}
+setupVisuals();
+
+// ============================================================================
+//  CANVAS SETUP
+// ============================================================================
+const canvas = document.getElementById('tray');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  const dpr = window.devicePixelRatio || 1;
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ============================================================================
+//  PHYSICS CONFIG
+// ============================================================================
+const phys = {
+  friction: 0.96, angularFriction: 0.95, restitution: 0.5,
+  settleThreshold: 0.4, gravityWell: 0.02,
+  maxRollTime: 3000, throwSpeed: 14, diceScale: 1.0, spinFactor: 0.5,
+};
+const DEFAULTS = { ...phys };
+
+// ============================================================================
+//  SIMULATION STATE
+// ============================================================================
+let dice = [];
+let settled = false;
+let rolling = false;
+let rollStartTime = 0;
+let flameParticles = [];
+let needsResettle = false;
+let obstacles = [];  // Rectangles { x, y, w, h } for pop-out window collisions
+
+// ============================================================================
+//  REROLL / SELECTION STATE
+//  Tracks which dice are currently selected via lasso or click, and stores
+//  pre-reroll state so the history panel can show old vs new values.
+//
+//  - nextDieId: auto-incrementing ID assigned to each Die on creation
+//  - lassoState: tracks the current lasso drag rectangle (null when inactive)
+//  - pendingRerollInfo: set before a reroll starts, consumed when dice settle
+// ============================================================================
+let nextDieId = 0;
+let lassoState = null;
+let pendingRerollInfo = null;
+
+/** Deselects all dice and updates the Roll button text back to "Roll Dice". */
+function clearSelection() {
+  dice.forEach(d => d.selected = false);
+  updateRollButtonText();
+}
+
+/**
+ * Updates the Roll button label to reflect whether dice are selected.
+ * Shows "Reroll Selected" when dice are lasso-selected, otherwise "Roll Dice".
+ */
+function updateRollButtonText() {
+  const hasSelection = dice.some(d => d.selected);
+  document.getElementById('roll-btn').textContent = hasSelection ? 'Reroll Selected' : 'Roll Dice';
+}
+
+// ============================================================================
+//  ROLL HISTORY
+//  Stores up to MAX_HISTORY entries. Each entry contains:
+//  - timestamp, total, breakdown text
+//  - diceDetails: array of { id, sides, label, shape, value, kept, wasRerolled, oldValue }
+//  - isReroll: boolean indicating if this was a reroll
+//  - oldTotal: the total before the reroll (only for reroll entries)
+// ============================================================================
+const rollHistory = [];
+const MAX_HISTORY = 50;
+
+/**
+ * Records a fresh roll (not a reroll) in the history.
+ * Captures each die's value, type, and kept status.
+ */
+function recordRoll(total, breakdown) {
+  rollHistory.unshift({
+    timestamp: new Date(),
+    total,
+    breakdown,
+    isReroll: false,
+    oldTotal: null,
+    diceDetails: dice.map(d => ({
+      id: d.id, sides: d.sides, label: d.label, shape: d.shape,
+      value: d.value, kept: d.kept, wasRerolled: false, oldValue: null
+    }))
+  });
+  if (rollHistory.length > MAX_HISTORY) rollHistory.pop();
+  renderHistoryPanel();
+}
+
+/**
+ * Records a reroll in the history, showing which dice changed.
+ * Compares pre-reroll state to current state so the history panel
+ * can display old values struck through in red and new values in green.
+ */
+function recordReroll(total, breakdown, rerollInfo) {
+  const { preRerollState, preTotal, rerolledIds } = rerollInfo;
+  rollHistory.unshift({
+    timestamp: new Date(),
+    total,
+    breakdown,
+    isReroll: true,
+    oldTotal: preTotal,
+    diceDetails: dice.map(d => {
+      const pre = preRerollState.find(p => p.id === d.id);
+      return {
+        id: d.id, sides: d.sides, label: d.label, shape: d.shape,
+        value: d.value, kept: d.kept,
+        wasRerolled: rerolledIds.has(d.id),
+        oldValue: pre ? pre.value : d.value
+      };
+    })
+  });
+  if (rollHistory.length > MAX_HISTORY) rollHistory.pop();
+  renderHistoryPanel();
+}
+
+/**
+ * Draws a small monochrome die shape icon on a canvas element for the history panel.
+ * The shape outline is drawn in neutral gray (or green for rerolled dice),
+ * and the value is rendered as text on top of the shape.
+ *
+ * @param {HTMLCanvasElement} cvs  - The canvas element to draw on
+ * @param {string}           shape - Shape name from DICE_DEFS (e.g. 'cube', 'icosahedron')
+ * @param {number}           value - The die's rolled value to display
+ * @param {number}           sides - Number of sides (used for d100 display formatting)
+ * @param {boolean}          isRerolled - If true, draw in green to indicate a new value
+ * @param {boolean}          isKept     - If false, draw dimmed (die was dropped by keep-N)
+ */
+function drawHistoryDieIcon(cvs, shape, value, sides, isRerolled, isKept) {
+  const size = 34;
+  const dpr = window.devicePixelRatio || 1;
+  cvs.width = size * dpr;
+  cvs.height = size * dpr;
+  cvs.style.width = size + 'px';
+  cvs.style.height = size + 'px';
+  const c = cvs.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, size, size);
+  c.translate(size / 2, size / 2);
+
+  // Draw the die shape outline in monochrome (green if rerolled)
+  c.beginPath();
+  SHAPE_DRAW[shape](c, size / 2 - 3);
+  c.closePath();
+  c.strokeStyle = isRerolled ? 'rgba(76, 175, 80, 0.7)' : 'rgba(180, 180, 180, 0.4)';
+  c.lineWidth = 1.5;
+  c.stroke();
+
+  // Subtle fill so the value text is readable
+  c.fillStyle = isRerolled ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 255, 255, 0.04)';
+  c.fill();
+
+  // Format the value text (d100 uses special display: 100 -> "00", 10 -> "10", etc.)
+  let text = '' + value;
+  if (sides === 100) {
+    text = value === 100 ? '00' : String(value).padStart(2, '0');
+  }
+
+  // Draw the value number centered on the shape
+  c.fillStyle = isRerolled ? '#4caf50' : (isKept ? '#ddd' : '#666');
+  const fontSize = sides === 100 ? size * 0.34 : size * 0.42;
+  c.font = `bold ${fontSize}px 'Cinzel', serif`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(text, 0, 1);
+}
+
+/**
+ * Rebuilds the entire roll history panel HTML from the rollHistory array.
+ * Each entry gets a card with:
+ * - Header row: total (with old total struck through for rerolls), time
+ * - Dice row: small canvas icons for each die showing its shape and value
+ * - Breakdown text line
+ *
+ * For reroll entries, dice that were rerolled show:
+ * - The old value above the die icon in red with strikethrough
+ * - The die icon itself drawn with green outline and green value
+ * - Non-rerolled dice display normally with gray outlines
+ */
+function renderHistoryPanel() {
+  const container = document.getElementById('history-list');
+  if (rollHistory.length === 0) {
+    container.innerHTML = '<div style="color:#555;font-size:14px;text-align:center;padding:16px">No rolls yet</div>';
+    return;
+  }
+  container.innerHTML = '';
+  rollHistory.forEach(entry => {
+    const div = document.createElement('div');
+    div.className = 'history-entry' + (entry.isReroll ? ' reroll-entry' : '');
+
+    // -- Header row: total, optional reroll label, time --
+    const headerRow = document.createElement('div');
+    headerRow.className = 'history-header-row';
+
+    const totalSpan = document.createElement('span');
+    totalSpan.className = 'history-total';
+    if (entry.isReroll) {
+      // Show old total struck through in red, arrow, then new total
+      totalSpan.innerHTML = `<span class="old-total">${entry.oldTotal}</span> &rarr; ${entry.total}`;
+    } else {
+      totalSpan.textContent = entry.total;
+    }
+    headerRow.appendChild(totalSpan);
+
+    // Add "Reroll" badge for reroll entries
+    if (entry.isReroll) {
+      const label = document.createElement('span');
+      label.className = 'reroll-label';
+      label.textContent = 'Reroll';
+      headerRow.appendChild(label);
+    }
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'history-time';
+    timeSpan.textContent = entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    headerRow.appendChild(timeSpan);
+
+    div.appendChild(headerRow);
+
+    // -- Dice row: small shape icons with values --
+    if (entry.diceDetails && entry.diceDetails.length > 0) {
+      const diceRow = document.createElement('div');
+      diceRow.className = 'history-dice-row';
+
+      entry.diceDetails.forEach(d => {
+        const cell = document.createElement('div');
+        cell.className = 'history-die-cell';
+        if (!d.kept) cell.classList.add('not-kept');
+
+        // For rerolled dice, show the old value above the icon in red with strikethrough
+        if (d.wasRerolled) {
+          const oldVal = document.createElement('div');
+          oldVal.className = 'old-die-value';
+          oldVal.textContent = d.oldValue;
+          cell.appendChild(oldVal);
+        }
+
+        // Draw the die shape canvas icon
+        const cvs = document.createElement('canvas');
+        cell.appendChild(cvs);
+        drawHistoryDieIcon(cvs, d.shape, d.value, d.sides, d.wasRerolled, d.kept);
+
+        diceRow.appendChild(cell);
+      });
+
+      div.appendChild(diceRow);
+    }
+
+    // -- Breakdown text --
+    const breakdownDiv = document.createElement('div');
+    breakdownDiv.className = 'history-breakdown';
+    breakdownDiv.textContent = entry.breakdown;
+    div.appendChild(breakdownDiv);
+
+    container.appendChild(div);
+  });
+}
+
+// Clear history button in the right sidebar
+document.getElementById('clear-history-btn').addEventListener('click', () => {
+  rollHistory.length = 0;
+  renderHistoryPanel();
+});
+
+// ============================================================================
+//  PHYSICS SETTINGS PANEL
+// ============================================================================
+document.getElementById('physics-toggle').addEventListener('click', e => {
+  if (e.target.closest('.popout-btn')) return;
+  document.getElementById('physics-panel').classList.toggle('open');
+  document.querySelector('#physics-toggle .arrow').classList.toggle('open');
+});
+
+function setupSliders() {
+  const sl = id => document.getElementById(id);
+  sl('sl-lock').addEventListener('input', e => { phys.maxRollTime = +e.target.value * 1000; sl('val-lock').textContent = (+e.target.value).toFixed(1) + 's'; });
+  sl('sl-friction').addEventListener('input', e => { const v = +e.target.value; phys.friction = 0.999 - (v / 100) * 0.099; phys.angularFriction = phys.friction; const labels = ['None','Very Low','Low','Medium','High','Very High','Max']; sl('val-friction').textContent = labels[Math.min(Math.floor(v / 100 * 6), 6)]; });
+  sl('sl-speed').addEventListener('input', e => { phys.throwSpeed = +e.target.value; const v = +e.target.value; sl('val-speed').textContent = v <= 6 ? 'Gentle' : v <= 12 ? 'Light' : v <= 18 ? 'Medium' : v <= 24 ? 'Hard' : 'Max'; });
+  sl('sl-bounce').addEventListener('input', e => { phys.restitution = +e.target.value / 100; sl('val-bounce').textContent = phys.restitution.toFixed(2); });
+  sl('sl-gravity').addEventListener('input', e => { const v = +e.target.value; phys.gravityWell = (v / 100) * 0.2; sl('val-gravity').textContent = v === 0 ? 'Off' : v <= 20 ? 'Low' : v <= 50 ? 'Medium' : v <= 80 ? 'High' : 'Max'; });
+  sl('sl-size').addEventListener('input', e => { phys.diceScale = +e.target.value / 100; sl('val-size').textContent = phys.diceScale.toFixed(1) + 'x'; });
+  sl('sl-spin').addEventListener('input', e => { const v = +e.target.value; phys.spinFactor = v / 100; sl('val-spin').textContent = v === 0 ? 'None' : v <= 25 ? 'Low' : v <= 60 ? 'Medium' : v <= 85 ? 'High' : 'Wild'; });
+  sl('reset-physics-btn').addEventListener('click', () => {
+    Object.assign(phys, DEFAULTS);
+    sl('sl-lock').value = 3;       sl('val-lock').textContent = '3.0s';
+    sl('sl-friction').value = 75;  sl('val-friction').textContent = 'High';
+    sl('sl-speed').value = 14;     sl('val-speed').textContent = 'Medium';
+    sl('sl-bounce').value = 50;    sl('val-bounce').textContent = '0.50';
+    sl('sl-gravity').value = 10;   sl('val-gravity').textContent = 'Low';
+    sl('sl-size').value = 100;     sl('val-size').textContent = '1.0x';
+    sl('sl-spin').value = 50;      sl('val-spin').textContent = 'Medium';
+  });
+}
+setupSliders();
+
+// ============================================================================
+//  FLAME PARTICLE SYSTEM
+//  Creates small flame particles that rise from dice showing their max value.
+// ============================================================================
+class FlameParticle {
+  constructor(x, y) {
+    this.x = x + (Math.random() - 0.5) * 20;
+    this.y = y + (Math.random() - 0.5) * 20;
+    this.vx = (Math.random() - 0.5) * 1.5;
+    this.vy = -1 - Math.random() * 2.5;
+    this.life = 1;
+    this.decay = 0.015 + Math.random() * 0.02;
+    this.size = 3 + Math.random() * 5;
+  }
+  update() { this.x += this.vx; this.y += this.vy; this.vy -= 0.02; this.life -= this.decay; this.size *= 0.98; }
+  draw(ctx) {
+    if (this.life <= 0) return;
+    const r = 255, g = Math.floor(255 * this.life), b = Math.floor(80 * this.life * this.life);
+    ctx.save(); ctx.globalAlpha = this.life * 0.8;
+    ctx.shadowColor = `rgb(${r},${g},0)`; ctx.shadowBlur = 12;
+    ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+}
+
+function spawnFlames(die) {
+  for (let i = 0; i < 4; i++) flameParticles.push(new FlameParticle(die.x, die.y - die.radius * 0.3));
+}
+
+// ============================================================================
+//  DIE CLASS
+//  Represents a single die on the rolling tray. Each die has physics
+//  properties (position, velocity, rotation), a unique ID for tracking
+//  across rerolls, and a selected flag for the lasso selection system.
+// ============================================================================
+class Die {
+  constructor(type, colorIdx, x, y) {
+    this.id = nextDieId++;  // Unique ID for tracking this die across rerolls
+    this.type = type; this.sides = type.sides; this.colorIdx = colorIdx;
+    this.shape = type.shape; this.label = type.label;
+    const baseR = this.sides === 100 ? 55 : Math.min(36 + this.sides * 1.6, 55);
+    this.radius = baseR * phys.diceScale;
+    this.x = x; this.y = y;
+    const halfRange = phys.throwSpeed * 0.4;
+    const speed = (phys.throwSpeed - halfRange) + Math.random() * halfRange * 2;
+    const angle = Math.random() * Math.PI * 2;
+    this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed;
+    this.rotation = Math.random() * Math.PI * 2;
+    this.angularVel = (Math.random() - 0.5) * phys.spinFactor * 2;
+    this.value = 0; this.settled = false; this.slowSince = 0;
+    this.kept = true; this.isMax = false;
+    this.selected = false;  // True when this die is part of a lasso selection
+  }
+
+  get color() { return getDieColor(this.colorIdx); }
+
+  roll() {
+    if (this.sides === 100) {
+      this.value = Math.floor(Math.random() * 10) * 10;
+      if (this.value === 0) this.value = 100;
+    } else {
+      this.value = Math.floor(Math.random() * this.sides) + 1;
+    }
+    this.isMax = (this.value === this.sides) || (this.sides === 100 && this.value === 100);
+  }
+
+  update() {
+    const cx = W / 2, cy = H / 2;
+    const dx = cx - this.x, dy = cy - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 50) { this.vx += (dx / dist) * phys.gravityWell; this.vy += (dy / dist) * phys.gravityWell; }
+    this.vx *= phys.friction; this.vy *= phys.friction;
+    this.angularVel *= phys.angularFriction;
+    this.x += this.vx; this.y += this.vy;
+    this.rotation += this.angularVel;
+
+    // Wall bounces
+    const r = this.radius, pad = 10;
+    if (this.x - r < pad)     { this.x = pad + r;     this.vx =  Math.abs(this.vx) * phys.restitution; }
+    if (this.x + r > W - pad) { this.x = W - pad - r; this.vx = -Math.abs(this.vx) * phys.restitution; }
+    if (this.y - r < pad)     { this.y = pad + r;     this.vy =  Math.abs(this.vy) * phys.restitution; }
+    if (this.y + r > H - pad) { this.y = H - pad - r; this.vy = -Math.abs(this.vy) * phys.restitution; }
+
+    // Settle detection
+    const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+    const now = performance.now();
+    if (speed < phys.settleThreshold && Math.abs(this.angularVel) < 0.02) {
+      if (!this.slowSince) this.slowSince = now;
+      else if (now - this.slowSince >= 1000) { this.vx = 0; this.vy = 0; this.angularVel = 0; this.settled = true; }
+    } else { this.slowSince = 0; }
+  }
+
+  draw(ctx) {
+    ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation);
+    const r = this.radius;
+
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3;
+    this.drawShape(ctx, r); ctx.restore();
+    this.drawShape(ctx, r);
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1.5; this.drawShape(ctx, r, true);
+    const grad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, 0, 0, 0, r);
+    grad.addColorStop(0, 'rgba(255,255,255,0.25)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad; this.drawShape(ctx, r);
+
+    ctx.rotate(-this.rotation);
+    const slowing = this.slowSince && (performance.now() - this.slowSince > 300);
+    const displayValue = (this.settled || slowing) ? this.value : Math.floor(Math.random() * this.sides) + 1;
+
+    if (this.settled && this.isMax) { ctx.shadowColor = '#ff6600'; ctx.shadowBlur = 20; ctx.fillStyle = '#fff4e0'; }
+    else { ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 3; }
+
+    ctx.font = `bold ${r * 0.7}px '${vis.diceFont}', serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let text = '' + displayValue;
+    if (this.sides === 100) text = displayValue === 100 ? '00' : String(displayValue).padStart(2, '0');
+    ctx.fillText(text, 0, 1);
+    ctx.font = `${r * 0.3}px '${vis.diceFont}', serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.shadowBlur = 0;
+    ctx.fillText(this.label, 0, r * 0.55);
+    ctx.restore();
+
+    // Dim overlay for dice not kept (dropped by keep-N setting)
+    if (this.settled && !this.kept) {
+      ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(this.x, this.y, r + 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+
+    // ---- Selection glow ring ----
+    // When a die is selected via lasso, draw a pulsing gold ring around it.
+    // The ring pulses between 60-100% opacity using a sine wave on the
+    // current timestamp, giving a breathing/glowing effect. The glow is
+    // drawn in screen coordinates (after the main ctx.restore) so it
+    // doesn't rotate with the die.
+    if (this.selected) {
+      ctx.save();
+      const pulse = (Math.sin(performance.now() / 300) + 1) / 2; // 0..1 oscillation
+      const alpha = 0.6 + pulse * 0.4;
+      ctx.shadowColor = `rgba(201, 168, 76, ${alpha})`;
+      ctx.shadowBlur = 15 + pulse * 10;
+      ctx.strokeStyle = `rgba(201, 168, 76, ${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius + 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawShape(ctx, r, strokeOnly = false) {
+    ctx.beginPath();
+    switch (this.shape) {
+      case 'triangle':      this.polygon(ctx, r * 1.1, 3, -Math.PI / 2); break;
+      case 'tetrahedron':   this.polygon(ctx, r * 1.15, 3, -Math.PI / 2); break;
+      case 'cube':          { const s = r * 0.9; ctx.rect(-s, -s, s * 2, s * 2); } break;
+      case 'octahedron':    this.polygon(ctx, r * 1.1, 4, 0); break;
+      case 'trapezohedron':
+        ctx.moveTo(0, -r * 1.2); ctx.lineTo(r * 0.8, 0); ctx.lineTo(0, r * 1.2); ctx.lineTo(-r * 0.8, 0); break;
+      case 'dodecahedron':  this.polygon(ctx, r * 1.08, 5, -Math.PI / 2); break;
+      case 'icosahedron':   this.polygon(ctx, r * 1.05, 10, -Math.PI / 2); break;
+      case 'percentile':    ctx.arc(0, 0, r, 0, Math.PI * 2); break;
+    }
+    ctx.closePath();
+    if (strokeOnly) { ctx.stroke(); } else { ctx.fillStyle = this.color; ctx.fill(); }
+
+    if (!strokeOnly) {
+      if (this.shape === 'icosahedron') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
+        ctx.beginPath(); this.polygon(ctx, r * 0.55, 5, -Math.PI / 2); ctx.closePath(); ctx.stroke();
+        for (let i = 0; i < 5; i++) {
+          const oA = -Math.PI / 2 + (Math.PI * 2 * (i * 2)) / 10;
+          const iA = -Math.PI / 2 + (Math.PI * 2 * i) / 5;
+          ctx.beginPath(); ctx.moveTo(Math.cos(oA) * r * 1.05, Math.sin(oA) * r * 1.05);
+          ctx.lineTo(Math.cos(iA) * r * 0.55, Math.sin(iA) * r * 0.55); ctx.stroke();
+        }
+      }
+      if (this.shape === 'tetrahedron') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
+        const v = []; for (let i = 0; i < 3; i++) { const a = -Math.PI/2+(Math.PI*2*i)/3; v.push({x:Math.cos(a)*r*1.15,y:Math.sin(a)*r*1.15}); }
+        ctx.beginPath(); for (let i = 0; i < 3; i++) { const mx=(v[i].x+v[(i+1)%3].x)/2, my=(v[i].y+v[(i+1)%3].y)/2; if(i===0)ctx.moveTo(mx,my);else ctx.lineTo(mx,my); }
+        ctx.closePath(); ctx.stroke();
+      }
+      if (this.shape === 'dodecahedron') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+        ctx.beginPath(); this.polygon(ctx, r * 0.5, 5, Math.PI / 2); ctx.closePath(); ctx.stroke();
+      }
+    }
+  }
+
+  polygon(ctx, r, n, startAngle) {
+    for (let i = 0; i < n; i++) { const a = startAngle + (Math.PI * 2 * i) / n; if (i === 0) ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r); else ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r); }
+  }
+}
+
+// ============================================================================
+//  DIE-TO-DIE COLLISION RESOLUTION
+// ============================================================================
+function resolveCollisions() {
+  for (let i = 0; i < dice.length; i++) {
+    for (let j = i + 1; j < dice.length; j++) {
+      const a = dice[i], b = dice[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy), minDist = a.radius + b.radius;
+      if (dist < minDist && dist > 0) {
+        const nx = dx / dist, ny = dy / dist, overlap = (minDist - dist) / 2;
+        a.x -= nx * overlap; a.y -= ny * overlap; b.x += nx * overlap; b.y += ny * overlap;
+        const relVelNormal = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+        if (relVelNormal > 0) {
+          const impulse = relVelNormal * phys.restitution;
+          a.vx -= impulse * nx; a.vy -= impulse * ny; b.vx += impulse * nx; b.vy += impulse * ny;
+          a.angularVel += (Math.random() - 0.5) * 0.15; b.angularVel += (Math.random() - 0.5) * 0.15;
+        }
+      }
+    }
+  }
+}
+
+// ============================================================================
+//  DIE-TO-OBSTACLE (RECTANGLE) COLLISION
+//  Uses closest-point-on-rect algorithm for circle-rectangle collision.
+// ============================================================================
+function resolveObstacleCollisions() {
+  for (const die of dice) {
+    if (die === dragDie) continue;
+    for (const rect of obstacles) {
+      // Find closest point on rectangle to circle center
+      const closestX = Math.max(rect.x, Math.min(die.x, rect.x + rect.w));
+      const closestY = Math.max(rect.y, Math.min(die.y, rect.y + rect.h));
+      const dx = die.x - closestX, dy = die.y - closestY;
+      const distSq = dx * dx + dy * dy;
+      const r = die.radius;
+
+      if (distSq < r * r) {
+        if (distSq > 0) {
+          // Normal collision: push die out along the normal
+          const dist = Math.sqrt(distSq);
+          const nx = dx / dist, ny = dy / dist;
+          die.x += nx * (r - dist);
+          die.y += ny * (r - dist);
+          const velDotN = die.vx * nx + die.vy * ny;
+          if (velDotN < 0) {
+            die.vx -= (1 + phys.restitution) * velDotN * nx;
+            die.vy -= (1 + phys.restitution) * velDotN * ny;
+            die.angularVel += (Math.random() - 0.5) * 0.15;
+          }
+        } else {
+          // Edge case: center inside rectangle. Push to nearest edge.
+          const dLeft = die.x - rect.x, dRight = (rect.x + rect.w) - die.x;
+          const dTop = die.y - rect.y, dBottom = (rect.y + rect.h) - die.y;
+          const minD = Math.min(dLeft, dRight, dTop, dBottom);
+          if (minD === dLeft)       { die.x = rect.x - r;          die.vx = -Math.abs(die.vx) * phys.restitution; }
+          else if (minD === dRight) { die.x = rect.x + rect.w + r; die.vx =  Math.abs(die.vx) * phys.restitution; }
+          else if (minD === dTop)   { die.y = rect.y - r;          die.vy = -Math.abs(die.vy) * phys.restitution; }
+          else                      { die.y = rect.y + rect.h + r; die.vy =  Math.abs(die.vy) * phys.restitution; }
+        }
+      }
+    }
+  }
+}
+
+// ============================================================================
+//  TRAY RENDERING
+// ============================================================================
+function drawTray() {
+  const preset = BG_PRESETS[vis.bgIdx];
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
+  bg.addColorStop(0, preset.center); bg.addColorStop(1, preset.edge);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = preset.tex;
+  for (let i = 0; i < W; i += 20) for (let j = 0; j < H; j += 20) if ((i + j) % 40 === 0) ctx.fillRect(i, j, 10, 10);
+
+  const pad = 8;
+  ctx.strokeStyle = vis.accentColor; ctx.lineWidth = 4;
+  ctx.shadowColor = vis.accentColor.replace(')', ',0.3)').replace('rgb', 'rgba'); ctx.shadowBlur = 15;
+  roundRect(ctx, pad, pad, W - pad * 2, H - pad * 2, 16); ctx.stroke(); ctx.shadowBlur = 0;
+  ctx.strokeStyle = vis.accentColor + '26'; ctx.lineWidth = 1;
+  roundRect(ctx, pad + 6, pad + 6, W - pad * 2 - 12, H - pad * 2 - 12, 12); ctx.stroke();
+}
+
+/** Draws a subtle glow on the canvas under each pop-out window obstacle. */
+function drawObstacleOutlines() {
+  for (const rect of obstacles) {
+    ctx.save();
+    ctx.strokeStyle = vis.accentColor + '40'; ctx.lineWidth = 2;
+    ctx.shadowColor = vis.accentColor; ctx.shadowBlur = 8;
+    roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 8); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r); ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r); ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r); ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
+}
+
+// ============================================================================
+//  ROLL LOGIC
+//  rollDice() creates a fresh set of dice from the sidebar selection.
+//  rerollDice() re-rolls only the specified dice (from lasso selection or
+//  double-click), preserving unselected dice in place.
+// ============================================================================
+
+/**
+ * Performs a full roll: clears all existing dice and creates new ones
+ * based on the current sidebar dice selection. Clears any lasso selection.
+ */
+function rollDice() {
+  dice = []; flameParticles = [];
+  settled = false; rolling = true;
+  rollStartTime = performance.now();
+  pendingRerollInfo = null;  // This is a fresh roll, not a reroll
+  const totalDice = Object.values(diceState).reduce((a, b) => a + b, 0);
+  if (totalDice === 0) return;
+  document.getElementById('total-value').textContent = '...';
+  document.getElementById('breakdown').textContent = '';
+  document.getElementById('status-msg').style.opacity = '0';
+
+  DICE_DEFS.forEach((dt, idx) => {
+    const count = diceState[dt.sides];
+    for (let i = 0; i < count; i++) {
+      const cx = W / 2 + (Math.random() - 0.5) * W * 0.4;
+      const cy = H / 2 + (Math.random() - 0.5) * H * 0.4;
+      const die = new Die(dt, idx, cx, cy);
+      die.roll(); dice.push(die);
+    }
+  });
+  clearSelection();
+  updateRollButtonText();
+}
+
+/**
+ * Rerolls only the specified dice, leaving all other dice untouched.
+ * Steps:
+ * 1. Captures the current total and all die values (pre-reroll snapshot)
+ * 2. Gives each selected die a new random value and small animation velocity
+ * 3. Stores reroll info so showResults() can record it in history
+ * 4. Clears the lasso selection and enters rolling state
+ *
+ * Unselected dice keep their exact positions and values. Keep/Bonus
+ * settings are recalculated fresh when the rerolled dice settle.
+ */
+function rerollDice(diceToReroll) {
+  if (diceToReroll.length === 0) return;
+
+  // Compute current total before rerolling (applying keep/bonus settings)
+  const keepN = +document.getElementById('keep-select').value;
+  const keepMode = document.getElementById('keep-mode').value;
+  const bonus = parseInt(document.getElementById('bonus-input').value) || 0;
+  const sorted = [...dice].sort((a, b) => keepMode === 'lowest' ? a.value - b.value : b.value - a.value);
+  let preKeptDice;
+  if (keepN > 0 && keepN < dice.length) {
+    const keptSet = new Set(sorted.slice(0, keepN));
+    preKeptDice = dice.filter(d => keptSet.has(d));
+  } else {
+    preKeptDice = [...dice];
+  }
+  const preTotal = preKeptDice.reduce((sum, d) => sum + d.value, 0) + bonus;
+
+  // Snapshot all die values before rerolling
+  const preRerollState = dice.map(d => ({
+    id: d.id, sides: d.sides, label: d.label, shape: d.shape,
+    value: d.value, kept: d.kept
+  }));
+  const rerolledIds = new Set(diceToReroll.map(d => d.id));
+
+  // Reroll selected dice: new random value + small animation from current position
+  diceToReroll.forEach(d => {
+    d.roll();
+    d.settled = false;
+    d.slowSince = 0;
+    // Give a smaller throw velocity than a full roll so they animate gently
+    const angle = Math.random() * Math.PI * 2;
+    const speed = phys.throwSpeed * 0.3;
+    d.vx = Math.cos(angle) * speed;
+    d.vy = Math.sin(angle) * speed;
+    d.angularVel = (Math.random() - 0.5) * phys.spinFactor;
+  });
+
+  // Clear selection and reset flame particles
+  clearSelection();
+  flameParticles = [];
+
+  // Enter rolling state so the animation loop processes physics
+  rolling = true;
+  settled = false;
+  rollStartTime = performance.now();
+
+  // Store reroll info for showResults() to consume when dice settle
+  pendingRerollInfo = { preRerollState, preTotal, rerolledIds };
+
+  document.getElementById('total-value').textContent = '...';
+  document.getElementById('breakdown').textContent = '';
+  document.getElementById('status-msg').style.opacity = '0';
+}
+
+function forceSettle() { dice.forEach(d => { d.vx = 0; d.vy = 0; d.angularVel = 0; d.settled = true; }); }
+
+/**
+ * Called when all dice have settled after a roll or reroll.
+ * Calculates the total (applying Keep/Bonus), updates the display,
+ * and records the result in history.
+ *
+ * @param {boolean} fromRoll - If true, this is from a roll/reroll (record in history).
+ *                             If false, this is from a flick re-settle (don't record).
+ */
+function showResults(fromRoll = false) {
+  settled = true; rolling = false;
+  const keepN = +document.getElementById('keep-select').value;
+  const keepMode = document.getElementById('keep-mode').value;
+  const bonus = parseInt(document.getElementById('bonus-input').value) || 0;
+  const sorted = [...dice].sort((a, b) => keepMode === 'lowest' ? a.value - b.value : b.value - a.value);
+
+  if (keepN > 0 && keepN < dice.length) {
+    const keptSet = new Set(sorted.slice(0, keepN));
+    dice.forEach(d => d.kept = keptSet.has(d));
+  } else { dice.forEach(d => d.kept = true); }
+
+  const keptDice = dice.filter(d => d.kept);
+  const diceTotal = keptDice.reduce((sum, d) => sum + d.value, 0);
+  const total = diceTotal + bonus;
+
+  const parts = {};
+  dice.forEach(d => {
+    if (!parts[d.label]) parts[d.label] = [];
+    parts[d.label].push((d.kept ? '' : '~') + d.value + (d.kept ? '' : '~'));
+  });
+
+  document.getElementById('total-value').textContent = total;
+
+  let breakdown = Object.entries(parts).map(([l, v]) => `${l}: ${v.join(', ')}`).join('  |  ');
+  if (keepN > 0 && keepN < dice.length) breakdown += `  (${keepMode === 'lowest' ? 'bottom' : 'top'} ${keepN})`;
+  if (bonus !== 0) breakdown += `  ${bonus >= 0 ? '+' : ''}${bonus} bonus`;
+  document.getElementById('breakdown').textContent = breakdown;
+
+  // Record in history for rolls/rerolls (not for flick re-settles)
+  if (fromRoll) {
+    if (pendingRerollInfo) {
+      // This was a reroll - record with old vs new comparison data
+      recordReroll(total, breakdown, pendingRerollInfo);
+      pendingRerollInfo = null;
+    } else {
+      // This was a fresh roll
+      recordRoll(total, breakdown);
+    }
+  }
+}
+
+function checkSettled() {
+  if (!rolling || dice.length === 0) return;
+  if (performance.now() - rollStartTime >= phys.maxRollTime) { forceSettle(); showResults(true); return; }
+  if (dice.every(d => d.settled)) showResults(true);
+}
+
+// ============================================================================
+//  POP-OUT WINDOW SYSTEM
+//  Allows sidebar panels to be popped out into draggable, resizable
+//  floating windows on the canvas. Pop-out windows act as physics
+//  obstacles that dice bounce off of.
+// ============================================================================
+
+// Panel registry: maps each sidebar section to its pop-out config
+// (Roll History is no longer here since it moved to the right sidebar)
+const panelRegistry = [
+  { id: 'dice-selection',   title: 'Dice Selection',   contentId: 'dice-list',          wrapperId: 'panel-dice-selection',   defaultRect: { x: 20, y: 20, w: 280, h: 230 } },
+  { id: 'keep-bonus',       title: 'Keep / Bonus',     contentId: 'keep-bonus-content', wrapperId: 'panel-keep-bonus',       defaultRect: { x: 20, y: 270, w: 280, h: 120 } },
+  { id: 'visual-settings',  title: 'Visual Settings',  contentId: 'visual-panel',       wrapperId: 'panel-visual-settings',  defaultRect: { x: 320, y: 20, w: 280, h: 300 } },
+  { id: 'physics-settings', title: 'Physics Settings', contentId: 'physics-panel',      wrapperId: 'panel-physics-settings', defaultRect: { x: 320, y: 340, w: 280, h: 380 } },
+];
+
+const popoutWindows = {}; // panelId -> { el, contentEl, x, y, w, h, cleanup }
+let topZ = 100;
+
+/** Syncs the obstacles array from all active pop-out windows. */
+function syncObstacles() {
+  obstacles = [];
+  for (const id in popoutWindows) {
+    const win = popoutWindows[id];
+    // Clamp to canvas bounds
+    win.x = Math.max(0, Math.min(win.x, W - 50));
+    win.y = Math.max(0, Math.min(win.y, H - 30));
+    win.el.style.left = win.x + 'px';
+    win.el.style.top = win.y + 'px';
+    obstacles.push({ x: win.x, y: win.y, w: win.w, h: win.h });
+  }
+}
+
+/** Pops a panel out of the sidebar into a floating window. */
+function popOutPanel(panelId) {
+  const config = panelRegistry.find(p => p.id === panelId);
+  if (!config || popoutWindows[panelId]) return;
+
+  const wrap = document.getElementById('canvas-wrap');
+  const contentEl = document.getElementById(config.contentId);
+  const wrapperEl = document.getElementById(config.wrapperId);
+
+  const win = {
+    el: null, contentEl: null,
+    x: config.defaultRect.x, y: config.defaultRect.y,
+    w: config.defaultRect.w, h: config.defaultRect.h,
+    cleanup: null,
+  };
+
+  // Create floating window DOM
+  const windowEl = document.createElement('div');
+  windowEl.className = 'popout-window';
+  windowEl.style.left = win.x + 'px'; windowEl.style.top = win.y + 'px';
+  windowEl.style.width = win.w + 'px'; windowEl.style.height = win.h + 'px';
+
+  const titlebar = document.createElement('div');
+  titlebar.className = 'popout-titlebar';
+  titlebar.innerHTML = `<span>${config.title}</span>`;
+  const dockBtn = document.createElement('button');
+  dockBtn.className = 'dock-btn'; dockBtn.innerHTML = '&#x2716;'; dockBtn.title = 'Dock to sidebar';
+  dockBtn.addEventListener('click', () => dockPanel(panelId));
+  titlebar.appendChild(dockBtn);
+
+  const content = document.createElement('div');
+  content.className = 'popout-content';
+
+  const resizeHandle = document.createElement('div');
+  resizeHandle.className = 'popout-resize';
+
+  windowEl.appendChild(titlebar);
+  windowEl.appendChild(content);
+  windowEl.appendChild(resizeHandle);
+
+  // Move sidebar content into the floating window
+  content.appendChild(contentEl);
+
+  // For collapsible panels, force content open
+  contentEl.classList.add('open');
+
+  // Hide sidebar wrapper
+  wrapperEl.classList.add('panel-docked-hidden');
+
+  wrap.appendChild(windowEl);
+  win.el = windowEl;
+  win.contentEl = content;
+
+  // Bring to front on click
+  windowEl.addEventListener('mousedown', () => { topZ++; windowEl.style.zIndex = topZ; });
+
+  // --- Drag ---
+  let isDragging = false, dragOX = 0, dragOY = 0;
+  const onDragDown = (e) => {
+    if (e.target.closest('.dock-btn') || e.target.closest('.popout-resize')) return;
+    isDragging = true;
+    const wrapRect = wrap.getBoundingClientRect();
+    dragOX = e.clientX - wrapRect.left - win.x;
+    dragOY = e.clientY - wrapRect.top - win.y;
+    e.preventDefault();
+  };
+  const onDragMove = (e) => {
+    if (!isDragging) return;
+    const wrapRect = wrap.getBoundingClientRect();
+    win.x = Math.max(0, Math.min(e.clientX - wrapRect.left - dragOX, wrapRect.width - win.w));
+    win.y = Math.max(0, Math.min(e.clientY - wrapRect.top - dragOY, wrapRect.height - win.h));
+    windowEl.style.left = win.x + 'px'; windowEl.style.top = win.y + 'px';
+    syncObstacles();
+  };
+  const onDragUp = () => { isDragging = false; };
+  titlebar.addEventListener('mousedown', onDragDown);
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragUp);
+
+  // --- Resize ---
+  let isResizing = false, rStartX = 0, rStartY = 0, rStartW = 0, rStartH = 0;
+  const onResizeDown = (e) => {
+    isResizing = true;
+    rStartX = e.clientX; rStartY = e.clientY; rStartW = win.w; rStartH = win.h;
+    e.preventDefault(); e.stopPropagation();
+  };
+  const onResizeMove = (e) => {
+    if (!isResizing) return;
+    win.w = Math.max(200, rStartW + (e.clientX - rStartX));
+    win.h = Math.max(100, rStartH + (e.clientY - rStartY));
+    windowEl.style.width = win.w + 'px'; windowEl.style.height = win.h + 'px';
+    syncObstacles();
+  };
+  const onResizeUp = () => { isResizing = false; };
+  resizeHandle.addEventListener('mousedown', onResizeDown);
+  document.addEventListener('mousemove', onResizeMove);
+  document.addEventListener('mouseup', onResizeUp);
+
+  // Cleanup function to remove listeners when docking
+  win.cleanup = () => {
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', onDragUp);
+    document.removeEventListener('mousemove', onResizeMove);
+    document.removeEventListener('mouseup', onResizeUp);
+  };
+
+  popoutWindows[panelId] = win;
+  syncObstacles();
+}
+
+/** Docks a floating window back into the sidebar. */
+function dockPanel(panelId) {
+  const win = popoutWindows[panelId];
+  if (!win) return;
+  const config = panelRegistry.find(p => p.id === panelId);
+  const contentEl = document.getElementById(config.contentId);
+  const wrapperEl = document.getElementById(config.wrapperId);
+
+  // Move content back to sidebar
+  wrapperEl.appendChild(contentEl);
+  wrapperEl.classList.remove('panel-docked-hidden');
+
+  // For collapsible panels, collapse when docking back
+  if (contentEl.classList.contains('config-panel')) {
+    contentEl.classList.remove('open');
+    const arrow = wrapperEl.querySelector('.arrow');
+    if (arrow) arrow.classList.remove('open');
+  }
+
+  win.cleanup();
+  win.el.remove();
+  delete popoutWindows[panelId];
+  syncObstacles();
+}
+
+// Wire up all pop-out buttons via delegation
+document.getElementById('sidebar').addEventListener('click', e => {
+  const btn = e.target.closest('.popout-btn');
+  if (!btn) return;
+  e.stopPropagation();
+  popOutPanel(btn.dataset.panel);
+});
+
+// ============================================================================
+//  ANIMATION LOOP
+// ============================================================================
+function loop() {
+  resize();
+  drawTray();
+  syncObstacles();
+
+  if (rolling) {
+    dice.forEach(d => { if (d !== dragDie) d.update(); });
+    resolveCollisions();
+    resolveObstacleCollisions();
+    checkSettled();
+  } else {
+    dice.forEach(d => { if (!d.settled && d !== dragDie) d.update(); });
+    if (dice.some(d => !d.settled && d !== dragDie)) {
+      resolveCollisions();
+      resolveObstacleCollisions();
+    }
+    if (needsResettle) { needsResettle = false; }
+    else if (!settled && dice.length > 0 && dice.every(d => d.settled)) { showResults(); }
+  }
+
+  drawObstacleOutlines();
+  dice.forEach(d => d.draw(ctx));
+
+  // ---- Lasso selection rectangle ----
+  // Drawn as a dashed gold rectangle with translucent fill while the user
+  // is dragging on empty canvas space. The rectangle follows the mouse
+  // from the initial click point to the current position.
+  if (lassoState && lassoState.active) {
+    ctx.save();
+    const lx = Math.min(lassoState.startX, lassoState.endX);
+    const ly = Math.min(lassoState.startY, lassoState.endY);
+    const lw = Math.abs(lassoState.endX - lassoState.startX);
+    const lh = Math.abs(lassoState.endY - lassoState.startY);
+    ctx.strokeStyle = 'rgba(201, 168, 76, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.fillStyle = 'rgba(201, 168, 76, 0.08)';
+    ctx.fillRect(lx, ly, lw, lh);
+    ctx.strokeRect(lx, ly, lw, lh);
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  if (settled) { dice.forEach(d => { if (d.isMax && d.kept) spawnFlames(d); }); }
+  flameParticles.forEach(p => { p.update(); p.draw(ctx); });
+  flameParticles = flameParticles.filter(p => p.life > 0);
+
+  if (!rolling && dice.length === 0) document.getElementById('status-msg').style.opacity = '1';
+  requestAnimationFrame(loop);
+}
+
+// ============================================================================
+//  ROLL BUTTON & KEYBOARD HANDLERS
+//  The Roll button behavior depends on whether dice are selected:
+//  - No selection: performs a fresh roll from sidebar dice counts
+//  - Dice selected: rerolls only the selected dice
+// ============================================================================
+document.getElementById('roll-btn').addEventListener('click', () => {
+  const selectedList = dice.filter(d => d.selected);
+  if (selectedList.length > 0) {
+    rerollDice(selectedList);
+  } else {
+    rollDice();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) {
+    e.preventDefault();
+    const selectedList = dice.filter(d => d.selected);
+    if (selectedList.length > 0) {
+      rerollDice(selectedList);
+    } else {
+      rollDice();
+    }
+  }
+});
+
+// ============================================================================
+//  DRAG & LASSO INTERACTION
+//  Handles three types of canvas mouse interaction:
+//
+//  1. DRAG: Click and hold on a settled die to pick it up and drag it.
+//     Release to flick it (if mouse was moving) or drop it in place.
+//
+//  2. LASSO: Click and drag on empty canvas space to draw a selection
+//     rectangle. When released, all settled dice whose centers fall
+//     inside the rectangle become "selected" (shown with a glowing ring).
+//     Disabled while dice are actively rolling.
+//
+//  3. CLICK: A simple click on empty space (no drag) clears the
+//     current selection.
+//
+//  The lasso uses a 5px movement threshold to distinguish between a
+//  click (clear selection) and a drag (draw lasso rectangle).
+// ============================================================================
+let dragDie = null, dragOffsetX = 0, dragOffsetY = 0, lastMouseX = 0, lastMouseY = 0, mouseVX = 0, mouseVY = 0;
+
+function releaseDie(die, vx, vy) {
+  die.vx = vx * 0.5; die.vy = vy * 0.5;
+  const flicked = Math.abs(die.vx) > 0.5 || Math.abs(die.vy) > 0.5;
+  if (flicked) {
+    die.settled = false; die.slowSince = 0; die.roll();
+    die.angularVel = (Math.random() - 0.5) * phys.spinFactor * 2;
+    settled = false; needsResettle = true;
+  }
+}
+
+function getCanvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) };
+}
+
+function findDieAt(mx, my) {
+  for (let i = dice.length - 1; i >= 0; i--) {
+    const d = dice[i], dx = mx - d.x, dy = my - d.y;
+    if (dx * dx + dy * dy <= d.radius * d.radius) return d;
+  }
+  return null;
+}
+
+canvas.addEventListener('mousedown', e => {
+  const pos = getCanvasPos(e), hit = findDieAt(pos.x, pos.y);
+  if (hit && hit.settled) {
+    // Start dragging a die
+    dragDie = hit; dragOffsetX = hit.x - pos.x; dragOffsetY = hit.y - pos.y;
+    lastMouseX = pos.x; lastMouseY = pos.y; mouseVX = mouseVY = 0;
+    canvas.style.cursor = 'grabbing';
+  } else if (!rolling && dice.length > 0 && !hit) {
+    // Start potential lasso on empty space (only when dice aren't rolling)
+    lassoState = {
+      startX: pos.x, startY: pos.y,
+      endX: pos.x, endY: pos.y,
+      active: false  // Becomes true after 5px of mouse movement
+    };
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  const pos = getCanvasPos(e);
+  if (dragDie) {
+    // Dragging a die - track velocity for flick release
+    mouseVX = pos.x - lastMouseX; mouseVY = pos.y - lastMouseY;
+    lastMouseX = pos.x; lastMouseY = pos.y;
+    dragDie.x = pos.x + dragOffsetX; dragDie.y = pos.y + dragOffsetY;
+    const r = dragDie.radius, pad = 10;
+    dragDie.x = Math.max(pad + r, Math.min(W - pad - r, dragDie.x));
+    dragDie.y = Math.max(pad + r, Math.min(H - pad - r, dragDie.y));
+  } else if (lassoState) {
+    // Drawing lasso rectangle - update endpoint and check movement threshold
+    lassoState.endX = pos.x;
+    lassoState.endY = pos.y;
+    if (!lassoState.active) {
+      const dx = lassoState.endX - lassoState.startX;
+      const dy = lassoState.endY - lassoState.startY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        lassoState.active = true;
+      }
+    }
+  } else {
+    // Hovering - show grab cursor when over a settled die
+    const hit = findDieAt(pos.x, pos.y);
+    canvas.style.cursor = (hit && hit.settled) ? 'grab' : 'default';
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (dragDie) {
+    // Release dragged die with flick velocity
+    releaseDie(dragDie, mouseVX, mouseVY); dragDie = null; canvas.style.cursor = 'default';
+  } else if (lassoState) {
+    if (lassoState.active) {
+      // Lasso drag completed - select all settled dice whose centers
+      // fall inside the lasso rectangle
+      const minX = Math.min(lassoState.startX, lassoState.endX);
+      const maxX = Math.max(lassoState.startX, lassoState.endX);
+      const minY = Math.min(lassoState.startY, lassoState.endY);
+      const maxY = Math.max(lassoState.startY, lassoState.endY);
+      clearSelection();
+      dice.forEach(d => {
+        if (d.settled && d.x >= minX && d.x <= maxX && d.y >= minY && d.y <= maxY) {
+          d.selected = true;
+        }
+      });
+      updateRollButtonText();
+    } else {
+      // Simple click on empty space - clear any active selection
+      clearSelection();
+    }
+    lassoState = null;
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (dragDie) { dragDie = null; canvas.style.cursor = 'default'; }
+  if (lassoState) { lassoState = null; }
+});
+
+// ============================================================================
+//  DOUBLE-CLICK REROLL
+//  Double-clicking a die triggers a reroll:
+//  - If the clicked die is selected (part of a lasso group), reroll ALL
+//    selected dice
+//  - If the clicked die is NOT selected, reroll just that single die
+//  Disabled while dice are actively rolling.
+// ============================================================================
+canvas.addEventListener('dblclick', e => {
+  if (rolling) return;
+  if (dice.length === 0) return;
+  const pos = getCanvasPos(e);
+  const hit = findDieAt(pos.x, pos.y);
+  if (hit && hit.settled) {
+    if (hit.selected) {
+      // Die is part of a selection - reroll all selected dice
+      rerollDice(dice.filter(d => d.selected));
+    } else {
+      // Die is not selected - reroll just this one die
+      rerollDice([hit]);
+    }
+  }
+});
+
+// ============================================================================
+//  TOUCH EVENTS
+//  Touch equivalents of the mouse drag interaction for mobile/tablet.
+// ============================================================================
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault(); const pos = getCanvasPos(e.touches[0]), hit = findDieAt(pos.x, pos.y);
+  if (hit && hit.settled) { dragDie = hit; dragOffsetX = hit.x - pos.x; dragOffsetY = hit.y - pos.y; lastMouseX = pos.x; lastMouseY = pos.y; mouseVX = mouseVY = 0; }
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault(); if (!dragDie) return; const pos = getCanvasPos(e.touches[0]);
+  mouseVX = pos.x - lastMouseX; mouseVY = pos.y - lastMouseY; lastMouseX = pos.x; lastMouseY = pos.y;
+  dragDie.x = pos.x + dragOffsetX; dragDie.y = pos.y + dragOffsetY;
+  const r = dragDie.radius, pad = 10;
+  dragDie.x = Math.max(pad + r, Math.min(W - pad - r, dragDie.x));
+  dragDie.y = Math.max(pad + r, Math.min(H - pad - r, dragDie.y));
+}, { passive: false });
+canvas.addEventListener('touchend', () => {
+  if (dragDie) { releaseDie(dragDie, mouseVX, mouseVY); dragDie = null; }
+});
+
+loop();
+</script>
+</body>
+</html>
