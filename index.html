@@ -974,7 +974,11 @@ let W, H;
 function resize() {
   const wrap = document.getElementById('canvas-wrap');
   const dpr = window.devicePixelRatio || 1;
-  W = wrap.clientWidth; H = wrap.clientHeight;
+  const newW = wrap.clientWidth, newH = wrap.clientHeight;
+  // Skip resize when canvas is not visible (e.g. mobile tab not on tray)
+  // to prevent W/H becoming 0, which breaks physics bounds
+  if (newW === 0 || newH === 0) return;
+  W = newW; H = newH;
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
@@ -1960,6 +1964,18 @@ function loop() {
 //  - Dice selected: rerolls only the selected dice
 // ============================================================================
 document.getElementById('roll-btn').addEventListener('click', () => {
+  // On mobile, switch to tray view first so canvas has valid dimensions
+  if (typeof isMobile === 'function' && isMobile() && typeof switchTab === 'function' && typeof currentTab !== 'undefined' && currentTab !== 'tray') {
+    switchTab('tray');
+    // Wait a frame for the canvas to become visible and resize
+    requestAnimationFrame(() => {
+      resize();
+      const selectedList = dice.filter(d => d.selected);
+      if (selectedList.length > 0) { rerollDice(selectedList); }
+      else { rollDice(); }
+    });
+    return;
+  }
   const selectedList = dice.filter(d => d.selected);
   if (selectedList.length > 0) {
     rerollDice(selectedList);
@@ -1971,6 +1987,17 @@ document.getElementById('roll-btn').addEventListener('click', () => {
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && e.target === document.body) {
     e.preventDefault();
+    // On mobile, switch to tray first so canvas has valid dimensions
+    if (typeof isMobile === 'function' && isMobile() && typeof switchTab === 'function' && typeof currentTab !== 'undefined' && currentTab !== 'tray') {
+      switchTab('tray');
+      requestAnimationFrame(() => {
+        resize();
+        const selectedList = dice.filter(d => d.selected);
+        if (selectedList.length > 0) { rerollDice(selectedList); }
+        else { rollDice(); }
+      });
+      return;
+    }
     const selectedList = dice.filter(d => d.selected);
     if (selectedList.length > 0) {
       rerollDice(selectedList);
@@ -2234,13 +2261,7 @@ if (isMobile()) {
 //  and Space key works globally. But we also auto-switch to tray after rolling
 //  from the controls tab.
 // ============================================================================
-const origRollHandler = document.getElementById('roll-btn').onclick;
-document.getElementById('roll-btn').addEventListener('click', () => {
-  if (isMobile() && currentTab === 'controls') {
-    // Switch to tray after clicking Roll so user sees the dice
-    setTimeout(() => switchTab('tray'), 100);
-  }
-});
+// (Mobile roll-from-controls is handled in the main roll-btn handler above)
 
 // ============================================================================
 //  TOUCH: DOUBLE-TAP TO REROLL
