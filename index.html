@@ -449,6 +449,140 @@
     color: rgba(201, 168, 76, 0.6); font-family: 'MedievalSharp', cursive;
     font-size: 18px; pointer-events: none; transition: opacity 0.5s;
   }
+
+  /* ==========================================
+     MOBILE TAB BAR
+     Bottom navigation for switching between
+     Controls, Tray, and History views on mobile.
+     Hidden on desktop.
+     ========================================== */
+  #mobile-tab-bar {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 56px;
+    background: linear-gradient(180deg, #16213e 0%, #0f1a30 100%);
+    border-top: 2px solid #c9a84c;
+    z-index: 200;
+    justify-content: space-around; align-items: center;
+  }
+  #mobile-tab-bar button {
+    flex: 1; height: 100%;
+    background: none; border: none; color: #888;
+    font-family: 'Cinzel', serif; font-size: 11px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; cursor: pointer; transition: color 0.2s;
+  }
+  #mobile-tab-bar button .tab-icon { font-size: 20px; line-height: 1; }
+  #mobile-tab-bar button.active { color: #c9a84c; }
+
+  /* ==========================================
+     MOBILE RESPONSIVE LAYOUT
+     ========================================== */
+  @media (max-width: 768px) {
+    body {
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh; /* dynamic viewport height for mobile browsers */
+      overflow: hidden;
+    }
+
+    #mobile-tab-bar { display: flex; }
+
+    /* Hide sidebars by default; show via .mobile-visible */
+    #sidebar, #history-sidebar {
+      display: none;
+      width: 100%;
+      height: calc(100vh - 56px);
+      height: calc(100dvh - 56px);
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 150;
+      border: none;
+    }
+    #sidebar.mobile-visible, #history-sidebar.mobile-visible {
+      display: flex;
+    }
+    #history-sidebar.mobile-visible {
+      border-left: none;
+    }
+
+    /* Main area takes full space minus tab bar */
+    #main {
+      flex: 1;
+      height: calc(100vh - 56px);
+      height: calc(100dvh - 56px);
+    }
+
+    /* Total bar: smaller on mobile */
+    #total-bar {
+      height: 48px;
+      font-size: 16px;
+      gap: 10px;
+      padding: 0 12px;
+    }
+    #total-bar .value { font-size: 26px; min-width: 40px; }
+    #breakdown { font-size: 11px; max-width: 55%; }
+
+    /* Status msg above the tab bar */
+    #status-msg { bottom: 12px; font-size: 15px; }
+
+    /* Dice tiles: larger touch targets */
+    .dice-tile { padding: 8px 4px 6px; }
+    .dice-tile .tile-icon { width: 48px; height: 48px; }
+    .dice-tile .tile-icon canvas { width: 48px; height: 48px; }
+    .tile-btns button {
+      width: 36px; height: 36px;
+      font-size: 18px;
+      border-radius: 6px;
+    }
+    .tile-btns { gap: 4px; margin-top: 4px; }
+
+    /* Roll/Clear buttons: full width, touch-friendly */
+    #roll-btn {
+      font-size: 22px;
+      padding: 16px;
+      margin-top: 10px;
+    }
+    #clear-btn {
+      padding: 12px;
+      font-size: 14px;
+    }
+
+    /* Sidebar inner padding */
+    #sidebar { padding: 14px 16px 16px; }
+
+    /* Swatches: bigger touch targets */
+    .swatch { width: 32px; height: 32px; border-radius: 6px; }
+
+    /* Sliders: taller thumb for easier grabbing */
+    .slider-row input[type="range"] { height: 6px; }
+    .slider-row input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
+    .slider-row input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+
+    /* Config toggles: larger tap area */
+    .config-toggle { padding: 12px 14px; font-size: 14px; }
+
+    /* Select/input: larger for touch */
+    .inline-section select, .inline-section input[type="number"] {
+      padding: 8px 10px; font-size: 14px;
+    }
+    .inline-section label { font-size: 13px; }
+
+    /* Popout buttons: hide on mobile (not useful in single-pane view) */
+    .popout-btn { display: none; }
+
+    /* History entries: comfortable spacing */
+    .history-total { font-size: 20px; }
+    .history-breakdown { font-size: 13px; }
+  }
+
+  /* Small phones (under 400px) */
+  @media (max-width: 400px) {
+    #dice-list { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .dice-tile .tile-icon { width: 42px; height: 42px; }
+    .dice-tile .tile-icon canvas { width: 42px; height: 42px; }
+    .tile-btns button { width: 32px; height: 32px; font-size: 16px; }
+    #sidebar h1 { font-size: 20px; }
+  }
 </style>
 </head>
 <body>
@@ -608,6 +742,22 @@
   <div id="history-list">
     <div style="color:#555;font-size:14px;text-align:center;padding:16px">No rolls yet</div>
   </div>
+</div>
+
+<!-- Mobile Tab Bar (hidden on desktop) -->
+<div id="mobile-tab-bar">
+  <button id="tab-controls" class="active" data-tab="controls">
+    <span class="tab-icon">&#9881;</span>
+    <span>Controls</span>
+  </button>
+  <button id="tab-tray" data-tab="tray">
+    <span class="tab-icon">&#9866;</span>
+    <span>Tray</span>
+  </button>
+  <button id="tab-history" data-tab="history">
+    <span class="tab-icon">&#9776;</span>
+    <span>History</span>
+  </button>
 </div>
 
 <script>
@@ -1993,6 +2143,195 @@ canvas.addEventListener('touchmove', e => {
 canvas.addEventListener('touchend', () => {
   if (dragDie) { releaseDie(dragDie, mouseVX, mouseVY); dragDie = null; }
 });
+
+// ============================================================================
+//  MOBILE TAB NAVIGATION
+//  Switches between Controls (left sidebar), Tray (canvas), and History
+//  (right sidebar) views on mobile via the bottom tab bar.
+// ============================================================================
+const mobileTabBar = document.getElementById('mobile-tab-bar');
+const tabButtons = mobileTabBar ? mobileTabBar.querySelectorAll('button') : [];
+
+function isMobile() {
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
+let currentTab = 'tray'; // Default to tray on mobile load
+
+function switchTab(tab) {
+  currentTab = tab;
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('main');
+  const history = document.getElementById('history-sidebar');
+
+  // Reset visibility
+  sidebar.classList.remove('mobile-visible');
+  history.classList.remove('mobile-visible');
+  main.style.display = '';
+
+  if (isMobile()) {
+    switch (tab) {
+      case 'controls':
+        sidebar.classList.add('mobile-visible');
+        main.style.display = 'none';
+        break;
+      case 'tray':
+        main.style.display = '';
+        break;
+      case 'history':
+        history.classList.add('mobile-visible');
+        main.style.display = 'none';
+        break;
+    }
+  }
+
+  // Update active tab button
+  tabButtons.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+
+  // Trigger resize so canvas recalculates dimensions
+  if (tab === 'tray') {
+    requestAnimationFrame(resize);
+  }
+}
+
+tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// On resize, if we cross the mobile breakpoint, reset layout
+let wasMobile = isMobile();
+window.addEventListener('resize', () => {
+  const nowMobile = isMobile();
+  if (wasMobile !== nowMobile) {
+    wasMobile = nowMobile;
+    const sidebar = document.getElementById('sidebar');
+    const main = document.getElementById('main');
+    const history = document.getElementById('history-sidebar');
+
+    if (!nowMobile) {
+      // Switching to desktop - show everything
+      sidebar.classList.remove('mobile-visible');
+      history.classList.remove('mobile-visible');
+      main.style.display = '';
+    } else {
+      // Switching to mobile - show tray by default
+      switchTab('tray');
+    }
+  }
+});
+
+// On initial load, if mobile, show tray view
+if (isMobile()) {
+  switchTab('tray');
+}
+
+// ============================================================================
+//  MOBILE ROLL BUTTON ON TRAY
+//  On mobile, when viewing the tray, the Roll button is in the hidden sidebar.
+//  The Roll button in the sidebar still works when that tab is active,
+//  and Space key works globally. But we also auto-switch to tray after rolling
+//  from the controls tab.
+// ============================================================================
+const origRollHandler = document.getElementById('roll-btn').onclick;
+document.getElementById('roll-btn').addEventListener('click', () => {
+  if (isMobile() && currentTab === 'controls') {
+    // Switch to tray after clicking Roll so user sees the dice
+    setTimeout(() => switchTab('tray'), 100);
+  }
+});
+
+// ============================================================================
+//  TOUCH: DOUBLE-TAP TO REROLL
+//  Detects double-tap on a die (two taps within 300ms) to trigger reroll,
+//  since there's no dblclick event on mobile touch.
+// ============================================================================
+let lastTapTime = 0;
+let lastTapX = 0;
+let lastTapY = 0;
+
+canvas.addEventListener('touchend', e => {
+  if (rolling) return;
+  if (dice.length === 0) return;
+
+  const now = Date.now();
+  const touch = e.changedTouches[0];
+  if (!touch) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const tapX = (touch.clientX - rect.left) * (W / rect.width);
+  const tapY = (touch.clientY - rect.top) * (H / rect.height);
+
+  // Check if this is a double-tap (within 300ms and 30px of last tap)
+  const dt = now - lastTapTime;
+  const dx = tapX - lastTapX;
+  const dy = tapY - lastTapY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  if (dt < 300 && dist < 30 && !dragDie) {
+    const hit = findDieAt(tapX, tapY);
+    if (hit && hit.settled) {
+      if (hit.selected) {
+        rerollDice(dice.filter(d => d.selected));
+      } else {
+        rerollDice([hit]);
+      }
+      lastTapTime = 0; // Reset to prevent triple-tap
+      return;
+    }
+  }
+
+  lastTapTime = now;
+  lastTapX = tapX;
+  lastTapY = tapY;
+});
+
+// ============================================================================
+//  TOUCH: LONG-PRESS TO SELECT (TAP-AND-HOLD)
+//  Long-pressing (500ms) on a settled die toggles its selection state,
+//  providing a touch alternative to the lasso selection system.
+// ============================================================================
+let longPressTimer = null;
+let longPressTriggered = false;
+
+canvas.addEventListener('touchstart', e => {
+  longPressTriggered = false;
+  if (rolling || dice.length === 0) return;
+
+  const touch = e.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const tx = (touch.clientX - rect.left) * (W / rect.width);
+  const ty = (touch.clientY - rect.top) * (H / rect.height);
+  const hit = findDieAt(tx, ty);
+
+  if (hit && hit.settled) {
+    longPressTimer = setTimeout(() => {
+      longPressTriggered = true;
+      hit.selected = !hit.selected;
+      updateRollButtonText();
+      // Prevent the drag from continuing after long-press
+      if (dragDie === hit) {
+        dragDie = null;
+      }
+    }, 500);
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchmove', () => {
+  // Cancel long-press if finger moves (user is dragging)
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}, { passive: true });
+
+canvas.addEventListener('touchend', () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}, { passive: true });
 
 loop();
 </script>
